@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace:填写映射当前的Mapper接口，所有的增删改查的参数和返回值类型，
+		就可以直接填写缩写，不区分大小写，直接通过方法名去找类型-->
+<mapper namespace="com.lizhiqiang.springcloud.dao.PaymentDao">
+
+    <!-- 由于已经设置表 payment 主键为bigserial自增长，就不需要mybatis自增长策略 -->
+    <insert id="create" parameterType="Payment">
+        insert into payment(serial) values(#{serial});
+    </insert>
+
+    <resultMap id="BaseResultMap" type="Payment">
+        <id column="id" property="id" jdbcType="BIGINT" />
+        <result column="serial" property="serial" jdbcType="VARCHAR" />
+    </resultMap>
+    <select id="getPaymentById" parameterType="Long" resultMap="BaseResultMap">
+        select * from payment where id = #{id};
+    </select>
+
+</mapper>
