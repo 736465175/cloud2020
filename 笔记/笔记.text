@@ -388,7 +388,156 @@ SpringCloud Config 分布式配置中心
         4.自动化加载最新的配置
         5.将配置信息以REST接口的形式暴露
 
+    5.使用
+        1.服务端：
+            1.git 地址 https://github.com/736465175/springcloud-config.git  账户 736465175  密码 lzq19910214
+            2. 多个环境配置文件，保存格式必须UTF-8，如果需要修改，命名 git add , git commit -m "init yml" ,git push origin master
+            3.依赖
+                spring-cloud-config-server ，spring-cloud-starter-netflix-eureka-client
+            4.yml配置
+                spring:
+                  application:
+                    name: cloud-config-center
+                  cloud:
+                    config:
+                      server:
+                        git:
+                          uri: https://github.com/736465175/springcloud-config.git #github上面的git仓库名
+                          #搜索目录
+                          search-paths:
+                            - springcloud-config
+                          #读取分支
+                      label: master
+            5.主启动类添加 @EnableConfigServer
+            6.hosts修改 增加映射 127.0.0.1 config-3344.com
+                C:\Windows\System32\drivers\etc
+            7.启动项目（先启动Eureka） 访问 http://config-3344.com:3344/master/config-dev.yml
+                成功读取到 github上读取内容
+            8.严格配置读取规则
+                1./{label(分支)}/{application(文件名,可以是微服务名称)}-{profile(后缀)}.yml
+                    master分支：   http://config-3344.com:3344/master/config-dev.yml
+                    dev   分支：   http://config-3344.com:3344/dev/config-dev.yml
 
+        2.客户端：
+            1.依赖：spring-cloud-starter-config，spring-cloud-starter-netflix-eureka-client
+                    spring-boot-starter-web(缺少无法启动，也不报错！！！)
+            2.bootstrap.yml
+                说明：
+                    1.application.yml 是用户级的资源配置项，bootstrap.yml是系统级的，优先级更高。
+                    2.Spring Cloud会创建一个"BootStrap Context"，作为Spring应用的Application Context的
+                        父上下文。初始化的时候，BootStrap Context负责从外部源加载配置属性并解析配置。这两
+                        上下文共享一个外部获取的'Environment'。
+                    3.'BootStrap'属性优先级高，默认情况下，它们不会被本地配置覆盖，'BootStrap Context'和
+                        'Application Context' 有着不同的约定，所以新增了一个'bootstrap.yml'文件，保证
+                        'BootStrap Context' 和'Application Context'配置分离。
+                    4.需要将Client端的application.yml修改为 bootstrap.yml。（热部署修改bootstrap.yml 失效了？？？）
+
+        3.分布式配置的动态刷新问题：
+            Linux运维修改GitHub上的配置文件内容，刷新3344发现ConfigServer配置中心立即响应(立即更新)；
+                刷新3355发现ConfigClient没有任何响应(没有更新到最新的配置)，除非自己重启或者重新加载。
+
+        4.Config客户端动态刷新(手动版)
+            1.修改3355模块，引入pom   spring-boot-starter-actuator (除网关Gateway不需要，其他module都需要)
+            2.修改YML，暴露监控接口
+                  #暴露监控端点
+                  management:
+                    endpoints:
+                      web:
+                        exposure:
+                          include: "*"  #统一写法
+            3.业务类Controller 类上添加@RefreshScope
+            4.还需要运维人员发送Post请求刷新3355，才能成功实现3355刷新到最新配置(需要每个微服务执行以下Post请求)
+                curl -X POST http://localhost:3355/actuator/refresh  激活3355加载最新的ConfigServer配置
+
+        5.Config客户端动态刷新(自动版)
+            广播，一次通知，处处生效；大范围的自动刷新 ；所以需要消息总线SpringCloud Bus来帮忙
+
+
+SpringCloud Bus 消息总线
+    1.它是SpringCloud Config的绝配，一般是一起使用，实现配置动态刷新。
+    2.SpringCloud Bus 是用来将分布式系统的节点与轻量级消息系统链接起来的框架，它整合了Java的事件处理机制和消息
+        中间件的功能；目前支持两种消息代理，RabbitMQ 和 Kafka
+    3.SpringCloud Bus能管理和传播分布式系统间的消息，就像一个分布式执行器，可用于广播状态变更、事件推送，也可以当做
+        微服务间的通信通道。
+
+    4.总线：
+        在微服务架构系统中，通常会使用 轻量级的消息代理 来构建一个 共同的消息主题，并让系统中所有微服务实例都连接上来。
+            由于 该主题中产生的消息会被所有实例监听和消费，所以称他为消息总线。 在总线上的各个实例，都可以方便的广播
+            一些需要让其他连接在该主题上的实例都知道的消息。
+    5.基本原理：
+        ConfigClient实例都监听MQ中同一个topic(默认是 springCloudBus)。当一个服务刷新数据的时候，它会把这个消息放
+            入到Topic中，这样其他监听同一个Topic的服务就能得到通知，然后去更新自身的配置。
+
+    6.RabbitMQ环境配置：
+        1.安装Erlang      http://erlang.org/download/otp_win64_21.3.exe
+        2.安装RabbitMQ    https://dl.bintray.com/rabbitmq/all/rabbitmq-server/3.7.14/
+        3.进入RabbitMQ安装目录下的sbin目录,输入以下命令启动管理功能
+            1.进入 D:\Program Files (x86)\RabbitMQ_3.7.14\rabbitmq_server-3.7.14\sbin 目录
+            2.cmd 输入命令： rabbitmq-plugins enable rabbitmq_management 安装可视化插件
+            3.Windows开始下标可以看到插件,点击start启动MQ
+        4.访问地址查看是否安装成功
+            http://localhost:15672/
+        5.输入账号密码登陆guest/guest
+
+    7.SpringCloud Bus动态刷新全局广播
+        1.RabbitMQ环境OK
+        2.演示广播效果，增加复杂度，以3355为模板新建一个3366
+        3.设计思想
+            1.利用消息总线触发一个客户端/bus/refresh,而刷新所有客户端的配置。
+            2.利用消息总线触发一个服务端ConfigServer的/bus/refresh端点，而刷新所有客户端的配置。
+            3.方式二更合适，方式一不合适原因：
+                1.因为微服务本身是业务模块，它本身不应该承担刷新配置的职责。
+                2.破坏了微服务各节点的对等性
+                3.有一定局限性，因网络、迁移等原因受到制约
+        4.给cloud-config-center3344配置中心服务端 添加消息总线支持
+            1.pom引入spring-boot-starter-bus-amqp 添加消息总线RabbitMQ支持,整合bus和RabbitMQ
+                spring-cloud-config-server包含了 springboot-starter  actuator web,不用再引入
+                这两包
+            2.yml修改， 增加
+                #RabbitMQ相关配置
+                spring
+                  rabbitmq:
+                    host: localhost
+                    port: 5672
+                    username: guest
+                    password: guest
+
+                #rabbitmq相关配置，暴露bus刷新配置的端点
+                management:
+                  endpoints:
+                    web:
+                      exposure:
+                        include: "bus-refresh"
+
+        5.给cloud-config-client3355/3366客户端添加消息总线支持
+            1.pom引入spring-boot-starter-bus-amqp 添加消息总线RabbitMQ支持,整合bus和RabbitMQ
+            2.yml修改
+                #RabbitMQ相关配置
+                spring
+                  rabbitmq:
+                    host: localhost
+                    port: 5672
+                    username: guest
+                    password: guest
+                #暴露监控端点
+                management:
+                    endpoints:
+                      web:
+                        exposure:
+                          include: "*"  #统一写法
+        6.测试
+            1.全部启动后查看所有配置，修改github上的配置，在查看一下所有服务读取的配置信息
+            2.发送POST请求给配置中心：
+                curl -X POST http://localhost:3344/actuator/bus-refresh
+                激活3344加载最新的git配置，并广播给所有客户端刷新到最新配置
+
+    8.SpringCloud Bus动态刷新定点通知
+        1.指定具体某一个实例生效而不是全部
+        2.公式：
+            发送POST请求给配置中心
+                curl -X POST http://localhost:3344/actuator/bus-refresh/{destination}
+            通过destination参数类指定需要更新配置的服务或实例，destination=Eureka注册中心上注册的服务名(小写):服务端口
+                例如：curl -X POST http://localhost:3344/actuator/bus-refresh/cloud-config-client:3355
 
 
 
