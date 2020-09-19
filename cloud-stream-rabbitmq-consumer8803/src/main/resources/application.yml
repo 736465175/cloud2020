@@ -1,5 +1,5 @@
 server:
-  port: 8802
+  port: 8803
 
 spring:
   application:
@@ -23,13 +23,14 @@ spring:
           content-type: application/json #设置消息类型，本次为json，文本则用"text/plain"
           binder: defaultRabbit #设置要绑定的消息服务的具体设置
           group: lizhiqiangA
+
 eureka:
   client:
     service-url:
       #集群配置
       defaultZone: http://eureka7001.com:7001/eureka,http://eureka7002.com:7002/eureka
   instance:
-    instance-id: cloud-stream-consumer8802
+    instance-id: cloud-stream-consumer8803
     prefer-ip-address: true #访问路径显示IP地址，方便排查
     lease-renewal-interval-in-seconds: 2 #设置心跳的时间间隔(默认是30秒)
     lease-expiration-duration-in-seconds: 5 #服务在5秒内没法送心跳连接，被注册中心移除

@@ -498,8 +498,7 @@ SpringCloud Bus 消息总线
                 3.有一定局限性，因网络、迁移等原因受到制约
         4.给cloud-config-center3344配置中心服务端 添加消息总线支持
             1.pom引入spring-boot-starter-bus-amqp 添加消息总线RabbitMQ支持,整合bus和RabbitMQ
-                spring-cloud-config-server包含了 springboot-starter  actuator/ web,不用再引入
-                这两包
+                spring-cloud-config-server包含了 springboot-starter  actuator/ web,不用再引入这两包
             2.yml修改， 增加
                 #RabbitMQ相关配置
                 spring
@@ -603,10 +602,11 @@ SpringCloud Stream 消息驱动：
                                     password: guest
                           bindings: #服务的整合处理
                             output: #这个名字是一个通道的名称，表示是生产者
-                              destination: studyExchange  #表示要是用的Exchange名称定义
+                              destination: studyExchange  #表示要使用的Exchange名称定义(主题)
                               content-type: application/json #设置消息类型，本次为json，文本则用"text/plain"
                               binder: defaultRabbit #设置要绑定的消息服务的具体设置
-                3.消息推送接口实现类(MessageProviderImpl)
+                3.主启动类只需要 @SpringBootApplication，开启Eureka注册服务功能H版默认通过配置即可
+                4.消息推送接口实现类(MessageProviderImpl)
                     1.类上注释 @EnableBinding(Source.class) ：
                         定义消息的推送管道，cloud stream 架构中提到，这里就是这样编码
                         //@Service 类上不需要该注释，因为这里的service是和Stream-RabbitMQ框架关联的，是配置层(@Configuration)，不是服务层了
@@ -615,9 +615,43 @@ SpringCloud Stream 消息驱动：
                         //springcloud stream官网告诉我们这样写
 
             2.cloud-stream-rabbitmq-consumer8802/8803 消费者
+                1.pom 引入 同 cloud-stream-rabbitmq-provider8801相同
+                2.yml配置 基本同cloud-stream-rabbitmq-provider8801相同，只需要将bindings.output修改为bindings.input表示消息消费者
+                3.主启动类只需要 @SpringBootApplication，开启Eureka注册服务功能H版默认通过配置即可
+                4.监听器 ReceiveMessageListenerController类，已经不是HTTP接口形式了，只负责监听定义好的目标主题destination: studyExchange(也可以理解订阅)
+                    该类注解 @EnableBinding(Sink.class)即可，
+                    其次编写方法
+                       @StreamListener(Sink.INPUT)
+                       public void input(Message<String> message){message.getPayload();...} 即可接收消息
+
+            3.分组消费与持久化
+                1.8802,8803运行后有两个问题：http://localhost:8801/sendMessage，出现重复消费问题。
+                    解决：在SpringCloud Stream中处于同一个组(group)的多个消费者是竞争关系，就能够保证消息只会被其中一个应用消费一次。
+                        不同的组才能全面消费(重复消费)，由于默认情况下8802/8803都是用默认分组(系统分配流水号)，导致它们是不同的组，
+                        消息被重复消费了。
+                2.查看服务是否是同一个组：
+                    登陆RabbitMQ  http://localhost:15672/  选择Exchanges->studyExchange(队列名点进去)->This exchange看到两个不同的组名
+                        studyExchange.anonymous.BxP_LB_nRNGRuCVqwgrHHA  8802(流水号就是组名)
+                        studyExchange.anonymous.kA3OcZqBQ6m0Wkxj4fcvSQ  8803
+                3.微服务消费者如何实现分组
+                    1.自定义配置分组(先将微服务分配为两个不同的自定义组)
+                        1.yml 8802修改,只需要添加bindings.input.group: lizhiqiangA
+                          .....
+                          bindings: #服务的整合处理
+                            input: #这个名字是一个通道的名称，表示是消费者
+                              destination: studyExchange  #表示要是用的Exchange名称定义，队列名称
+                              content-type: application/json #设置消息类型，本次为json，文本则用"text/plain"
+                              binder: defaultRabbit #设置要绑定的消息服务的具体设置
+                              group: lizhiqiangA
+
+                    2.自定义配置将微服务分为同一个组，解决重复消费问题
+                        8802/8803 bindings.input.group: lizhiqiangA group取名一样
+
+                4.持久化：有了分组属性，就具备了持久化！！！
 
 
-
+SpringCloud Sleuth 分布式请求链路跟踪
+    1.
 
 
 
