@@ -40,8 +40,15 @@ Eureka Server 实质：存key（存服务名），取value(调用地址)
 
 
 服务发现Discover
-    对于注册进eureka里面的微服务，可以通过服务发现(DiscoveryClient)来获得该服务的信息
-    修改cloud-provider-payment8001 的Controller,以及8001主启动类,@EnableDiscoveryClient
+    1.对于注册进eureka里面的微服务，可以通过服务发现(DiscoveryClient)来获得该服务的信息
+    2.修改cloud-provider-payment8001 的Controller,以及8001主启动类,@EnableDiscoveryClient
+    3.@EnableEurekaClient只适用于Eureka作为注册中心，而@EnableDiscoveryClient 可以是其他注册中心。
+        它们都能够让注册中心发现，并扫描到该服务（我们的项目）。
+        从Spring Cloud Edgware开始，@EnableEurekaClient 或 @EnableDiscoveryClient 是可省略的。
+        只需加上相关依赖，并进行相应配置，即可将微服务注册到服务发现组件上。(配置就是yml中的Eureka的配置)
+
+
+
 
 eureka 自我保护：
     某时刻某个微服务不可用了，Eureka不会立刻清理，依旧会对该微服务的信息进行保护；属于CAP里面的AP分支。
@@ -484,14 +491,14 @@ SpringCloud Bus 消息总线
         2.演示广播效果，增加复杂度，以3355为模板新建一个3366
         3.设计思想
             1.利用消息总线触发一个客户端/bus/refresh,而刷新所有客户端的配置。
-            2.利用消息总线触发一个服务端ConfigServer的/bus/refresh端点，而刷新所有客户端的配置。
+            2.利用消息总线触发一个服务端ConfigServer的/bus/refresh端点，而刷新所有客户端的配置。(推荐)
             3.方式二更合适，方式一不合适原因：
                 1.因为微服务本身是业务模块，它本身不应该承担刷新配置的职责。
                 2.破坏了微服务各节点的对等性
                 3.有一定局限性，因网络、迁移等原因受到制约
         4.给cloud-config-center3344配置中心服务端 添加消息总线支持
             1.pom引入spring-boot-starter-bus-amqp 添加消息总线RabbitMQ支持,整合bus和RabbitMQ
-                spring-cloud-config-server包含了 springboot-starter  actuator web,不用再引入
+                spring-cloud-config-server包含了 springboot-starter  actuator/ web,不用再引入
                 这两包
             2.yml修改， 增加
                 #RabbitMQ相关配置
@@ -540,11 +547,74 @@ SpringCloud Bus 消息总线
                 例如：curl -X POST http://localhost:3344/actuator/bus-refresh/cloud-config-client:3355
 
 
+SpringCloud Stream 消息驱动：
+    1.为什么引入：一种新技术，让我们不再关注具体MQ的细节，我们只需要用一种适配绑定的方式，自动在各种MQ内切换。
+    2.是什么：
+        1.屏蔽底层消息中间件的差异，降低切换成本，统一消息的编程模型。
+        2.官方定义：是一个构建消息驱动微服务的框架。应用程序通过inputs或者outputs来与SpringCloud Stream中的binder(绑定器)对象交互。
+            通过我们配置来binding，而SpringCloud Stream的binder对象负责与消息中间件交互。我们只需要清楚如何与SpringCloud Stream
+            交互就可以方便的使用消息驱动的方式。
+        3.通过使用Spring Integration 来连接消息代理中间件以实现消息事件驱动。SpringCloud Stream为这些供应商的消息中间件产品提供了
+            个性化的自动化配置实现，引用了发布-订阅、消费组、分区的三个核心概念。目前仅支持RabbitMQ和Kafka.
 
+    3.stream统一底层差异
+        1.通过定义绑定器作为中间层，完美的实现了 应用程序与消息中间件细节之间的隔离。通过向应用程序暴露统一的Channel通道，使得
+            应用程序不需要再考虑各种不同消息中间件实现。
+        2.通过定义绑定器Binder作为中间层，实现了应用程序与消息中间件细节之间的隔离。
+        3.Binder ：input(对应于消费者)，output(对应于生产者)
+        4.Stream中的消息通信方式遵循了发布-订阅模式：
+            主要是 Topic主题进行广播，RabbitMQ就是Exchange、Kafka中就是Topic
 
+    4.SpringCloud Stream 标准流程套路
+        消息生产者->业务逻辑->{SpringCloud Stream ： Source  Channel  Binder} ->MQ组件|
+        消息消费者->业务逻辑->{SpringCloud Stream ： Sink  Channel  Binder}        <- |
+        说明：
+            Binder： 连接中间件，屏蔽差异，应用与消息中间件之间的封装。
+            Channel: 通道，是Queue的一种抽象，在消息通讯系统中就是实现存储和转发的媒介
+            Source/Sink：输出、输入
 
+    5.编码API和常用注解
+        @input          注解标识输入通道，通过该输入通道接收到的消息进入应用程序
+        @output         注解标识输出通道，发布的消息将通过该通道离开应用程序
+        @StreamListener 监听队列，用于消费者的队列的消息接收
+        @EnableBinding  指信道channel和exchange绑定在一起
 
+    6案例说明
+        1.新建三个子模块
+            1.cloud-stream-rabbitmq-provider8801 生产者
+                1.pom引入 spring-cloud-starter-stream-rabbit，spring-cloud-starter-netflix-eureka-client
+                    spring-boot-starter-web，spring-boot-starter-actuator
+                2.yml配置
+                    spring:
+                      application:
+                        name: cloud-stream-provider
+                      cloud:
+                        stream:
+                          binders: #在此处配置要绑定的rabbitMq的服务信息
+                            defaultRabbit:  #表示定义的名称，用于binding整合
+                              type: rabbit  #消息组件类型
+                              environment:  #设置RabbitMQ的相关的环境配置
+                                spring:
+                                  #RabbitMQ相关配置,15672是web管理端口
+                                  rabbitmq:
+                                    host: localhost
+                                    port: 5672
+                                    username: guest
+                                    password: guest
+                          bindings: #服务的整合处理
+                            output: #这个名字是一个通道的名称，表示是生产者
+                              destination: studyExchange  #表示要是用的Exchange名称定义
+                              content-type: application/json #设置消息类型，本次为json，文本则用"text/plain"
+                              binder: defaultRabbit #设置要绑定的消息服务的具体设置
+                3.消息推送接口实现类(MessageProviderImpl)
+                    1.类上注释 @EnableBinding(Source.class) ：
+                        定义消息的推送管道，cloud stream 架构中提到，这里就是这样编码
+                        //@Service 类上不需要该注释，因为这里的service是和Stream-RabbitMQ框架关联的，是配置层(@Configuration)，不是服务层了
+                    2.该类注入org.springframework.messaging.MessageChannel output属性
+                        boolean sendResult = output.send(MessageBuilder.withPayload(serial).build());
+                        //springcloud stream官网告诉我们这样写
 
+            2.cloud-stream-rabbitmq-consumer8802/8803 消费者
 
 
 
