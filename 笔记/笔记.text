@@ -81,16 +81,20 @@ CAP: 理论关注粒度是数据，而不是整体系统设计的策略
 
 服务调用：
     Ribbon负载均衡服务调用 ： 即负载均衡(@LoadBalanced)+RestTemplate 调用
-        基于Netflix 实现的一套 客户端 负载均衡工具
-        负载均衡(LB)：
+        1.基于Netflix 实现的一套 客户端 负载均衡工具
+        2.负载均衡(LB)：
             集中式LB: LB是由服务端实现，独立的LB设施，如Nginx
             进程内LB: 本地负载均衡，在调用微服务接口时，会在注册中心上获取注册信息服务列表之后缓存到JVM本地，从而在本地实现RPC远程服务调用技术。
-        工作步骤：
+        3.工作步骤：
             先选择EurekaServer,再根据用户指定策略选择注册列表中的一个地址
-        算法：轮询、随机、加权重等
-        修改默认算法：  MyselfRule这个自定义配置类不能放在@ComponentScan所扫描的当前包下以及子包下 ，
-            主启动类添加@RibbonClient(name = "CLOUD-PAYMENT-SERVICE", configuration = MyselfRule.class)
-        轮询算法：核心是，第几次请求数%服务器集群总数量(原理是CAS+自旋锁取index)
+        4.算法：轮询、随机、加权重等
+        5.修改默认算法：
+            1.MyselfRule这个自定义配置类不能放在@ComponentScan所扫描的当前包下以及子包下 ，
+            2.主启动类添加@RibbonClient(name = "CLOUD-PAYMENT-SERVICE", configuration = MyselfRule.class)
+            3.取消RestTemplate的 @LoadBalanced 注解。
+            4.MyLoaderBalancer 接口和实现类，只能通过MyLoaderBalancer的instance方法拿到服务端的真实IP地址来调用，
+            5.没有注解@LoadBalanced 的RestTemplate 来通过微服务名称来调用肯定会报错，所有Controller层接口都得重写！！！
+        6.轮询算法：核心是，第几次请求数%服务器集群总数量(原理是CAS+自旋锁取index)
 
 
     RestTemplate的使用
@@ -651,7 +655,53 @@ SpringCloud Stream 消息驱动：
 
 
 SpringCloud Sleuth 分布式请求链路跟踪
+    1.在微服务框架中，一个由 客户端发起的请求在后端系统中会经过多个不同的微服务节点调用来协同产生最后的请求结果，每一个前段
+        请求都会形成一条复杂的分布式服务调用链路，链路中的任何一个环节出现高延时或者错误都会引起整个请求的最后失败。
+    2.Sleuth 提供了一套完整的服务跟踪的解决方案，在分布式系统中提供追踪解决方案并且兼容支持了zipkin。
+        Sleuth管监控(收集整理)，zipkin管展现。
+    3.搭建链路监控步骤
+        1.zipkin下载，SpringCloud从F版起已不需要自己构建Zipkin Server了，只需要调用jar包即可。
+            1.下载地址 https://dl.bintray.com/openzipkin/maven/io/zipkin/java/zipkin-server/
+            2.运行jar， java -jar  zipkin-server-2.12.9-exec.jar
+            3.运行控制台 http://localhost:9411/zipkin/
+            4.术语：
+                1.完整的调用链路：表示一请求链路，一条链路通过Trace id(微服务名称)唯一标识，Span表示发起的请求信息，各span通过parent id关联起来
+                2.Trance类似于树结构的Span集合，表示一条调用链路，存在唯一标识
+                3.Span表示调用链路来源，通俗的理解span就是一次请求
+        2.服务提供者
+            1.使用cloud-provider-payment8001
+            2.pom添加依赖 spring-cloud-starter-zipkin 包含了sleuth+zipkin
+            3.yml修改 添加
+                spring:
+                  application:
+                    name: cloud-payment-service
+                  zipkin:
+                    #监控数据图表打到zipkin dashboard 上
+                    base-url: http://localhost:9411
+                  sleuth:
+                    sampler:
+                      #采样率介于0到1之间，1表示全部采样
+                      probability: 1
+            4.业务类PaymentController增加测试方法
+        3.服务消费者
+            同上
+        4.调用服务后，打开浏览器访问http://localhost:9411
+
+
+SpringCloud Alibaba 入门简介
     1.
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -12,6 +12,11 @@
     <artifactId>cloud-consumer-order80</artifactId>
 
     <dependencies>
+        <!--包含了sleuth+zipkin,被springcloud收编为 sleuth-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-zipkin</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>

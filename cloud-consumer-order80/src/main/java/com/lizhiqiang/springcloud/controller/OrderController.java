@@ -39,18 +39,19 @@ public class OrderController {
 
 
     @GetMapping("/consumer/payment/create")
-    public CommonResult<Payment> create(Payment payment){
+    public CommonResult create(Payment payment){
 //        return restTemplate.postForObject(paymentUrl + "/payment/create", payment, CommonResult.class);
         return restTemplate.postForEntity(paymentUrl + "/payment/create", payment, CommonResult.class).getBody();
     }
 
     @GetMapping("/consumer/payment/get/{id}")
-    public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id){
+    public CommonResult getPaymentById(@PathVariable("id") Long id){
 //        return restTemplate.getForObject(paymentUrl + "/payment/get/" + id , CommonResult.class);
         log.info("使用getForEntity");
         return restTemplate.getForEntity(paymentUrl + "/payment/get/" + id , CommonResult.class).getBody();
     }
 
+    //测试自定义算法
     @GetMapping("/consumer/payment/lb")
     public String getPaymentLB(){
         //微服务名称 对应的实例列表
@@ -63,5 +64,12 @@ public class OrderController {
         URI uri = serviceInstance.getUri();
         return restTemplate.getForObject(uri + "/payment/lb", String.class);
     }
+
+    @GetMapping("/consumer/payment/zipkin")
+    public String paymentZipkin(){
+        log.info("测试 paymentZipkin");
+        return restTemplate.getForEntity(paymentUrl + "/payment/zipkin/", String.class).getBody();
+    }
+
 
 }
