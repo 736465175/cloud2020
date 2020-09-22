@@ -67,9 +67,10 @@ Consul 做注册中心：是一套开源的分布式服务发现和配置管理�
         consul 自带 UI 界面，打开网址：http://localhost:8500 ，可以看到当前注册的服务界面
 
 注册中心总结：
-    Eureka     java   AP
-    Consul     Go     CP
-    Zookeeper  Java   CP
+    1.Eureka     java   AP
+    2.Consul     Go     CP
+    3.Zookeeper  Java   CP
+    4.Nacos      Java   AP/CP模型可切换，支持控制台管理
 CP：当网络分区出现后，为了保证一致性，就必须拒绝请求，否则无法保证一致性。
     结论：违背了可用性A的要求，只满足一致性和分区容错，即CP
 
@@ -689,10 +690,125 @@ SpringCloud Sleuth 分布式请求链路跟踪
 
 
 SpringCloud Alibaba 入门简介
-    1.
+    1.SpringCloud Netflix项目进入维护模式，是从G版开始的；将模块设置于维护模式，意味着SpringCloud团队将不会再向模块添加新功能。
+        只会修复阻塞级别bug。
+    2.alibaba 推出的 Dubbo，后面被SpringCloud杀过来而取代，SpringCloud后面出问题了，SpringCloud Alibaba 杀过来了
+        SpringCloud Alibaba 目标是一切在云端(阿里云，商业推广)，SpringCloud也希望alibaba加入
+    3.2018-10-31 SpringCloud Alibaba 0.2.0正式入驻了 SpringCloud官方孵化器，并在Maven中央库发布了第一个版本
+    4.作用：
+        1.服务限流降级：默认支持Servlet、Feign、RestTemplate、Dubbo和 RocketMQ限流降级功能接入，可以在运行时通过控制台实时
+            修改限流降级规则，还支持查看限流降级Metrics监控
+        2.服务注册与发现：适配SpringCloud服务注册与发现标准，默认集成了Ribbon的支持。
+        3.分布式配置管理：支持分布式系统中的外部化配置，配置更改时自动刷新
+        4.消息驱动能力：基于SpringCloud Stream为微服务应用构建消息驱动能力
+        5.阿里云对象存储：阿里云提供的海量、安全、低成本、高可靠的云存储服务。支持在任何应用、任何时间、任何地点存储和访问任意
+            类型数据。
+        6.分布式任务调度：提供秒级、精准、高可靠、高可用的定时(基于Con表达式)任务调度服务。同时提供分布式的任务执行模型，如网
+            格任务。网格任务支持海量子任务均匀分配到所有Worker(Schedulerx-client)上执行
+    5.怎么玩
+        1.Sentinel(核心知识)：阿里巴巴开源产品，把流量作为切入点，从流量控制、熔断降级、系统负载保护等多个维度保护服务的稳定性。
+        2.Nacos(核心知识): 阿里巴巴开源产品，一个更易于构建云原生应用的动态服务发现、配置管理和服务管理平台。
+        3.RocketMQ： Apache RocketMQ 基于Java的高性能、高吞吐量的分布式消息和流计算平台
+        4.Dubbo： Apache Dubbo是一款高性能java RPC框架
+        5.Seata(核心知识): 阿里巴巴开源产品，一个易于使用的高性能微服务分布式事务解决方案
+        6.Alibaba Cloud OSS： 阿里云对象存储服务(Object Storage Service)，是阿里云提供海量、安全、低成本、高可靠的云存储服务。
+        7.Alibaba Cloud SchedulerX: 阿里中间件团队开发的一款分布式任务调度产品，支持周期性的任务与固定时间点触发任务。
+        8.中文官方文档：http://github.com/alibaba/spring-cloud-alibaba/blob/master/README-zh.md
 
 
+SpringCloud Alibaba Nacos 服务注册和配置中心
+    1.Nacos = Dynamic(动态) Naming and Configuration Service  == Eureka + Config + Bus
+        一个更易于构建云原生应用的动态服务发现、配置管理和服务管理平台.
+    2.下载和文档
+        1.https://nacos.io/zh-cn/ 文档
+        2.https://github.com/alibaba/nacos/releases
+    3.Nacos  AP模型，支持控制台管理；据说Nacos在阿里巴巴内部有超过10万的实例运行，经得起考验。
+    4.安装运行Nacos
+        1.本地Java8 + Maven环境
+        2.解压安装包，直接运行bin目录下startup.cmd 或者 cmd下独立运行startup.cmd -m standalone
+        3.运行成功后 访问 http://localhost:8848/nacos  密码nacos/nacos
 
+    5.Nacos作为注册中心
+        1.基于Nacos的服务提供者
+            1.新建module cloudalibaba-provider-payment9001
+            2.pom
+                1.父pom
+                          <dependency>
+                            <groupId>com.alibaba.cloud</groupId>
+                            <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                            <version>2.1.0.RELEASE</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                          </dependency>
+                2.本模块pom
+                     <dependency>
+                         <groupId>com.alibaba.cloud</groupId>
+                         <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+                     </dependency>
+            3.yml
+                 spring.application.name=nacos-payment-provider
+                 server.port=18082
+                 spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848
+                 #监控暴露
+                 management.endpoints.web.exposure.include=*
+            4.主启动类
+                 @SpringBootApplication
+                 @EnableDiscoveryClient
+            5.业务类略
+            6.服务启动后，通过http://localhost:8848/nacos 查看服务列表，能看到服务注册OK
+            7.重复新建9002演示负载均衡,alibaba-nacos-discovery 天生整合了Netflix ribbon
+
+        2.基于Nacos的服务消费者
+            1.新建module cloudalibaba-consumer-order8000
+            2.pom
+                1.父pom
+                          <dependency>
+                            <groupId>com.alibaba.cloud</groupId>
+                            <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                            <version>2.1.0.RELEASE</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                          </dependency>
+                2.本模块pom
+                     <dependency>
+                         <groupId>com.alibaba.cloud</groupId>
+                         <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+                     </dependency>
+            3.yml
+                 server:
+                   port: 8000
+                 spring:
+                   application:
+                     name: nacos-order-consumer
+                   cloud:
+                     nacos:
+                       discovery:
+                         server-addr: 127.0.0.1:8848
+                 #自定义配置，消费者访问微服务名称
+                 service-url:
+                   nacos-user-service: http://nacos-payment-provider
+            4.主启动类
+                 @SpringBootApplication
+                 @EnableDiscoveryClient
+            5.业务类略，同之前讲解ribbon一样
+                配置类 ApplicationContextConfig
+                @Bean
+                @LoadBalanced
+                public RestTemplate getRestTemplate(){
+                    return new RestTemplate();
+                }
+    6.各种注册中心比较
+        1.Nacos  Java   AP/CP模型可切换，支持控制台管理（参考笔记抓图）
+        2.C是所有节点在同一时间看到的数据是一致的，而A的定义是所有的请求都要收到响应
+        3.如何选择使用哪种模式
+            1.如果不需要存储服务级别的信息且服务实例是通过nacos-client注册，并能够保持心跳上报，那么就可以选择AP模式。
+                当前主流的服务如SpringCloud 和Dubbo服务，都适用于AP模式。AP模式为了服务的可用性而减弱了一致性，因此
+                AP模式下只支持注册临时的实例。
+            2.如果需要在服务级别编辑或者存储配置信息，那么CP是必须的，K8S服务和DNS服务则适合CP模式。
+                CP模式下则支持注册持久化实例，此时则是以Raft协议为集群运行模式，该模式下注册实例之前必须先注册服务，如果
+                服务不存在，则会返回错误。
+            3.切换Nacos注册中心CP模式
+                curl -X PUT '$NACOS_SERVER:8848/nacos/v1/ns/operator/switches?entry=serverMode&value=CP'
 
 
 

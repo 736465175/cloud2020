@@ -1,0 +1,14 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: nacos-order-consumer
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+
+#自定义配置，消费者访问微服务名称
+service-url:
+  nacos-user-service: http://nacos-payment-provider

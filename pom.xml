@@ -11,24 +11,27 @@
 
   <modules>
     <module>cloud-api-commons</module>
-    <module>cloud-eureka-server7001</module>
-    <module>cloud-eureka-server7002</module>
-        <module>cloud-provider-payment8001</module>
-        <module>cloud-provider-payment8002</module>
-        <module>cloud-consumer-order80</module>
-<!--    <module>cloud-provider-consul-payment8003</module>-->
-<!--    <module>cloud-consumer-consul-order80</module>-->
-<!--    <module>cloud-consumer-openfeign-order80</module>-->
-<!--    <module>cloud-provider-hystrix-payment8001</module>-->
-<!--    <module>cloud-consumer-openfeign-hystrix-order80</module>-->
-<!--      <module>cloud-consumer-hystrix-dashboard9001</module>-->
-<!--      <module>cloud-gateway-gateway9527</module>-->
-<!--      <module>cloud-config-center3344</module>-->
-<!--      <module>cloud-config-client3355</module>-->
-<!--      <module>cloud-config-client3366</module>-->
-<!--      <module>cloud-stream-rabbitmq-provider8801</module>-->
-<!--    <module>cloud-stream-rabbitmq-consumer8802</module>-->
-<!--    <module>cloud-stream-rabbitmq-consumer8803</module>-->
+<!--    <module>cloud-eureka-server7001</module>-->
+<!--    <module>cloud-eureka-server7002</module>-->
+<!--        <module>cloud-provider-payment8001</module>-->
+<!--        <module>cloud-provider-payment8002</module>-->
+<!--        <module>cloud-consumer-order80</module>-->
+    <!--    <module>cloud-provider-consul-payment8003</module>-->
+    <!--    <module>cloud-consumer-consul-order80</module>-->
+    <!--    <module>cloud-consumer-openfeign-order80</module>-->
+    <!--    <module>cloud-provider-hystrix-payment8001</module>-->
+    <!--    <module>cloud-consumer-openfeign-hystrix-order80</module>-->
+    <!--      <module>cloud-consumer-hystrix-dashboard9001</module>-->
+    <!--      <module>cloud-gateway-gateway9527</module>-->
+    <!--      <module>cloud-config-center3344</module>-->
+    <!--      <module>cloud-config-client3355</module>-->
+    <!--      <module>cloud-config-client3366</module>-->
+    <!--      <module>cloud-stream-rabbitmq-provider8801</module>-->
+    <!--    <module>cloud-stream-rabbitmq-consumer8802</module>-->
+    <!--    <module>cloud-stream-rabbitmq-consumer8803</module>-->
+    <module>cloudalibaba-provider-payment9001</module>
+    <module>cloudalibaba-provider-payment9002</module>
+    <module>cloudalibaba-consumer-order8000</module>
   </modules>
 
 
@@ -40,7 +43,7 @@
     <maven.compiler.target>1.8</maven.compiler.target>
     <junit.version>4.12</junit.version>
     <log4j.version>1.2.17</log4j.version>
-    <lombok.version>1.16.18</lombok.version>
+    <lombok.version>1.18.10</lombok.version>
     <mysql.version>5.1.47</mysql.version>
     <postgresql.version>42.2.4</postgresql.version>
     <druid.version>1.1.16</druid.version>
@@ -71,6 +74,7 @@
         <scope>import</scope>
       </dependency>
 
+      <!--  SpringCloud Alibaba  依赖  -->
       <dependency>
         <groupId>com.alibaba.cloud</groupId>
         <artifactId>spring-cloud-alibaba-dependencies</artifactId>
