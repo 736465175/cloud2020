@@ -810,7 +810,149 @@ SpringCloud Alibaba Nacos 服务注册和配置中心
             3.切换Nacos注册中心CP模式
                 curl -X PUT '$NACOS_SERVER:8848/nacos/v1/ns/operator/switches?entry=serverMode&value=CP'
 
+    7.Nacos作为服务配置中心
+        1.基础配置
+            1.cloudalibaba-config-nacos-client3377
+            2.pom依赖
+                spring-cloud-starter-alibaba-nacos-config
+                spring-cloud-starter-alibaba-nacos-discovery
+                spring-boot-starter-web
+                spring-boot-starter-actuator
+            3.yml配置
+                1.需要application.yml(设置私有配置) 和 bootstrap.yml(设置全局配置) 两个配置文件
+                2.因为Nacos同SpringCloud-config一样，在项目初始化时，要先保证从配置中心拉取配置，拉取后才保证项目正常启动。
+                3.bootstrap.yml
+                    server:
+                      port: 3377
+                    spring:
+                      application:
+                        name: nacos-config-client
+                      cloud:
+                        nacos:
+                          discovery:
+                            server-addr: 127.0.0.1:8848 #nacos 服务注册中心地址
+                          config:
+                            server-addr: 127.0.0.1:8848
+                            file-extension: yaml  #指定配置中心配置格式，properties是默认格式
+                    # ${spring.application.name}-${spring.profile.active}.${spring.cloud.nacos.config.file-extension}
+                4.application.yml
+                    spring:
+                      profiles:
+                        active: dev  #表示开发环境
+            4.业务类Controller层支持nacos动态刷新，添加注解
+                @RefreshScope //通过SpringCloud 原生注解实现配置自动更新
+            5.在nacos 中添加配置信息
+                1.nacos配置规则
+                    1.nacos中data id 的组成格式及与SpringBoot配置文件中的匹配规则
+                    2.${spring.application.name}-${spring.profile.active}.${spring.cloud.nacos.config.file-extension}
+                       dataid = nacos-config-client-dev.yaml
+                    3.nacos配置中心新建文件 nacos-config-client-dev.yaml ，格式选择yaml , 默认分组DEFAULT_GROUP
+            6.测试
+                1.运行3377，调用接口查看配置信息：http://localhost:3377/config/info
+                2.修改nacos配置中心上nacos-config-client-dev.yml内容，发现支持动态刷新
 
+        2.分类配置
+            1.多环境多项目管理
+                1.通常一个系统有 dev test prod 三个环境，如何保证指定环境启动时服务能正确读到Nacos上相应环境的配置文件
+                2.微服务子项目也有三个环境，如何配置管理
+            2.nacos的图形化界面
+                配置管理，命名空间
+            3.namespace + Group + Data ID 三者关系？为什么这么设计？
+                1.类似于Java里面的package名称和类名，最外层的namespace是可以用于区分部署环境的，Group 和 DataID逻辑上区分两个目标对象
+                2.默认情况
+                    Namespace=public ，命名空间主要是用来实现隔离
+                    Group=DEFAULT_GROUP ，Group可以把不同的微服务划分到同一个分组里面去
+                    默认Cluster = DEFAULT ，Cluster 是对指定微服务的一个虚拟划分
+                        Service 就是微服务，Instance就是微服务的实例
+            4.case三种方案加载配置
+                1.DataID方案
+                    1.常用：指定spring.profile.active和配置文件的DataID来使不同环境下读取不同的配置
+                    2.默认空间+默认分组+新建dev 和test 两个DataID
+                    3.通过config-nacos-client3377的 spring.profile.active属性就能进行多环境配置文件读取
+                2.Group方案
+                    1.通过Group实现环境区分
+                        1.在nacos图形界面控制台上新建配置文件DataID，这里配置Group 为DEV_GROUP
+                            1.nacos-config-client-info.yaml   DVE_GROUP
+                            2.nacos-config-client-info.yaml   TEST_GROUP
+                        2.bootstrap+application修改
+                            1.bootstrap增加 group: TEST_GROUP
+                                spring:
+                                  application:
+                                    name: nacos-config-client
+                                  cloud:
+                                    nacos:
+                                      discovery:
+                                        server-addr: 127.0.0.1:8848 #nacos 服务注册中心地址
+                                      config:
+                                        server-addr: 127.0.0.1:8848
+                                        file-extension: yaml  #指定配置中心配置格式，properties是默认格式
+                                        group: TEST_GROUP
+                            2.application修改 spring.profile.active=info
+                3.Namespace方案
+                    1.新建dev/test 的Namespace
+                        dev     12688ec5-c289-4af5-9657-6fe1da79df1a
+                        test    b96a9124-618f-4d73-a70a-8496ed11843a
+                    2.回到服务管理-服务列表查看
+                    3.按照域名配置填写
+                    4.yml
+                        spring:
+                          application:
+                            name: nacos-config-client
+                          cloud:
+                            nacos:
+                              discovery:
+                                server-addr: 127.0.0.1:8848 #nacos 服务注册中心地址
+                              config:
+                                server-addr: 127.0.0.1:8848
+                                file-extension: yaml  #指定配置中心配置格式，properties是默认格式
+                                group: DEV_GROUP
+                                namespace: 12688ec5-c289-4af5-9657-6fe1da79df1a
+    8.nacos集群和持久化配置(重点)
+        1.官方说明 https://nacos.io/zh-cn/docs/cluster-mode-quick-start.html
+            http://nacos.com:port/openAPI 域名 + VIP模式，可读性好，而且换ip方便，推荐模式
+        2.默认Nacos使用嵌入式数据库(derby)实现数据的存储。所以如果启动多个默认配置下的nacos节点，数据存储是存在一致性问题的。
+            为了解决这个问题，nacos采用了 集中式存储的方式来支持集群化部署，目前只支持MySQL的存储。
+        3.nacos支持3种部署模式
+            1.单机模式  ：用于测试和单机试用，也支持MySQL数据库存储
+            2.集群模式  ：用于生产环境，确保高可用
+            3.多集群模式：用于多数据中心场景
+        2.nacos持久化配置解释
+            1.默认Nacos使用嵌入式数据库(derby)实现数据的存储
+            2.derby切换到MySQL数据库配置
+                1.E:\java\tools\nacos-server-1.3.2\nacos\conf 目录下找到sql脚本 nacos-mysql.sql，数据库连接工具执行脚本
+                2.E:\java\tools\nacos-server-1.3.2\nacos\conf 目录下找到application.properties
+                    1.安装数据库，版本要求：5.6.5+
+                    2.初始化mysql数据库，数据库初始化文件：nacos-mysql.sql
+                    3.修改conf/application.properties文件，增加支持mysql数据源配置（目前只支持mysql），添加mysql数据源的url、用户名和密码。
+                        spring.datasource.platform=mysql
+                        db.num=1
+                        db.url.0=jdbc:mysql://11.162.196.16:3306/nacos_devtest?characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true
+                        db.user=nacos_devtest
+                        db.password=youdontknow
+        3.Linux版Nacos+MySQL生产环境配置
+            1.预计需要 1个Nginx + 3个nacos注册中心 + 1个MySQL
+            2.nacos下载Linux版
+            3.集群配置步骤
+                1.Linux服务器MySQL数据库配置
+                2.application.properties配置
+                3.Linux服务器上nacos的集群配置cluster.conf
+                    1.复制 cluster.conf.example 成 cluster.conf
+                    2.内容,表示3个是nacos集群节点，是一组的，这里的IP不能是127.0.0.1
+                        192.168.1.107:3333
+                        192.168.1.107:4444
+                        192.168.1.107:5555
+                4.编辑nacos的启动脚本startup.sh ，使它能够接收不同的启动端口
+                    1.期望启动命令变成 ./startup.sh -port 3333  端口和上一步cluster.conf 配置一致
+                    2.while getopts ":m:f:s:c:p:" opt -> while getopts ":m:f:s:c:p:port:" opt
+                        port)
+                           PORT=$OPTARG;;
+                      nohup $JAVA ${JAVA_OPT} nacos.nacos >> ${BASE_DIR}/logs/start.out 2>&1 &  修改为
+                      nohup $JAVA -Dserver.port=${PORT}  ${JAVA_OPT} nacos.nacos >> ${BASE_DIR}/logs/start.out 2>&1 &
+
+                5.Nginx配置，它作为负载均衡器
+
+            4.测试
+            5.高可用小结
 
 
 
