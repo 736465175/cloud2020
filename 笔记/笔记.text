@@ -981,15 +981,108 @@ SpringCloud Alibaba Nacos 服务注册和配置中心
             5.高可用小结，见笔记截图
 
 
-SpringCloud Alibaba Sentinel 实现熔断与限流
+SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
+    1.分布式系统的流量防卫兵 = Hystrix ,官方文档 https://github.com/alibaba/Sentinel/wiki/介绍
+    2.Sentinel 具有以下特征
+        1.丰富的应用场景：Sentinel 承接了阿里巴巴近 10 年的双十一大促流量的核心场景，例如秒杀（即突发流量控制在系统容量可以承受的范围）
+            、消息削峰填谷、集群流量控制、实时熔断下游不可用应用等。
+        2.完备的实时监控：Sentinel 同时提供实时的监控功能。您可以在控制台中看到接入应用的单台机器秒级数据，甚至 500 台以下规模的集群的
+            汇总运行情况。
+        3.广泛的开源生态：Sentinel 提供开箱即用的与其它开源框架/库的整合模块，例如与 Spring Cloud、Dubbo、gRPC 的整合。您只需要引入相
+            应的依赖并进行简单的配置即可快速地接入 Sentinel。
+        4.完善的 SPI 扩展点：Sentinel 提供简单易用、完善的 SPI 扩展接口。您可以通过实现扩展接口来快速地定制逻辑。例如定制规则管理、适配
+            动态数据源等。
+    3.作用
+        服务雪崩，服务降级，服务熔断，服务限流
+    4.Sentinel 分为两个部分
+        1.核心库（Java 客户端）不依赖任何框架/库，能够运行于所有 Java 运行时环境，同时对 Dubbo / Spring Cloud 等框架也有较好的支持。
+        2.控制台（Dashboard）基于 Spring Boot 开发，打包后可以直接运行，不需要额外的 Tomcat 等应用容器。
+    5.安装Sentinel控制台
+        1.启动
+            1.下载 sentinel-dashboard-1.7.1.jar，jdk8 + 8080端口环境
+            2.命令 java -jar sentinel-dashboard-1.7.1.jar
+        2.访问sentinel管理界面 http://localhost:8080  账号密码 sentinel 登陆成功后表示：降级、容错、监控、限流平台完成
+    6.初始化演示工程
+        1.启动nacos 8848 微服务注册/配置中心
+        2.建module cloudalibaba-sentinel-service8401
+            1.pom
+                spring-cloud-starter-alibaba-nacos-discovery
+                spring-cloud-starter-alibaba-sentinel
+                spring-cloud-starter-openfeign
+                spring-boot-starter-web
+                spring-boot-starter-actuator
+            2.yml
+                server:
+                  port: 8401
+                spring:
+                  application:
+                    name: cloudalibaba-sentinel-service
+                  cloud:
+                    nacos:
+                      discovery:
+                        #nacos 服务注册中心地址
+                        server-addr: 127.0.0.1:8848
+                    sentinel:
+                      transport:
+                        #配置 sentinel dashboard 地址
+                        dashboard: 127.0.0.1:8080
+                        #默认8719端口，假如被占用会自动依次从8719+1扫描，直至找到未被占用的端口
+                        port: 8719
+                #暴露监控端点
+                management:
+                  endpoints:
+                    web:
+                      exposure:
+                        include: '*'  #统一写法
+            3.主启动类
+                @SpringBootApplication
+                @EnableDiscoveryClient
+            4.业务类FlowLimitController
+        3.启动 sentinel-dashboard 8080
+        4.启动微服务8401,后查看Sentinel 控制台（懒加载），监控上了8401
+            1.Sentinel采用懒加载说明，执行一次调用即可 http:localhost:8401/sentinel/testA
 
-
-
-
-
-
-
-
+    7.Sentinel 流控规则
+        1.基本介绍，新增流控规则界面已截图，下面针对图形名词解释
+            1.资源名：唯一名称，默认请求路径
+            2.针对来源：Sentinel可以针对调用者进行限流，填写微服务名，默认default(不区分来源)
+            3.阈值类型/单机阈值：
+                QPS(每秒钟的请求数量)：当调用该api的QPS达到阈值的时候，进行限流(拦截在服务外)
+                线程数：当调用该api的线程数达到阈值的时候，进行限流(拦截在服务内，线程池超过阈值？)
+            4.是否集群：不需要集群(课程讲解不使用)
+            5.流控模式：
+                直接：api达到限流条件时，直接限流
+                关联：当关联的资源达到阈值时，就限流自己
+                链路：只记录指定链路上的流量(指定资源从入口资源进来的流量，如果达到阈值，就进行限流)[api级别的针对来源]
+            6.流控效果：
+                快速失败：直接失败，抛异常
+                Warm UP：根据codeFactor(冷加载因子，默认3)的值，从阈值/codeFactor，经过预热时长，才达到设置的QPS阈值
+                排队等待：匀速排队，让请求以匀速的速度通过，阈值类型必须设置为QPS，否则无效
+        2.流控模式
+            1.直接(系统默认)，阈值修改就能快速反应，不像hystrix要重启
+                1.配置方式：簇点链路菜单->列表视图-> /sentinel/testA ->流控+
+                    ->资源名：默认
+                    ->针对来源：默认
+                    ->阈值类型：QPS ，单机阈值 1
+                    ->流控模式:直接
+                    ->流控效果:快速失败
+                2.(快速访问)http://localhost:8401/sentinel/testA 页面返回 Blocked by Sentinel (flow limiting)
+                    直接调用默认报错信息<Blocked by Sentinel (flow limiting)>，技术方面OK，但是也可以添加自己的后续处理
+            2.关联
+                1.是什么
+                    1.当关联的资源达到阈值时，就限流自己
+                    2.即当与A关联的资源B达到阈值后，就限流A自己
+                    3.结果：B惹事了，A背锅(比如支付接口达到阈值后，限流下订单的接口，连坐)
+                2.配置A
+                    >资源名：默认(/sentinel/testA)
+                    ->针对来源：默认
+                    ->阈值类型：QPS ，单机阈值 1
+                    ->流控模式:关联
+                    ->关联资源：/sentinel/testB (这时设置的QPS阈值 只对B有效)
+                    ->流控效果:快速失败
+                3.postman模拟并发密集访问testB
+                4.运行后发现A挂了
+        3.流控效果
 
 
 
