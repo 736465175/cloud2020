@@ -747,10 +747,14 @@ SpringCloud Alibaba Nacos 服务注册和配置中心
                      </dependency>
             3.yml
                  spring.application.name=nacos-payment-provider
-                 server.port=18082
+                 server.port=9001
                  spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848
                  #监控暴露
                  management.endpoints.web.exposure.include=*
+                    Spring boot actuator端点启用和暴露
+                        1.在YAML中有特殊的含义，所以如果想使用include或者exclude包含所有的端点时要加上双引号
+                        2.* 可以用来表示所有的端点，例如，通过HTTP公开所有的端点，除了env和beans端点，使用如下的属性
+
             4.主启动类
                  @SpringBootApplication
                  @EnableDiscoveryClient
@@ -929,7 +933,7 @@ SpringCloud Alibaba Nacos 服务注册和配置中心
                         db.url.0=jdbc:mysql://11.162.196.16:3306/nacos_devtest?characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true
                         db.user=nacos_devtest
                         db.password=youdontknow
-        3.Linux版Nacos+MySQL生产环境配置
+        3.Linux版Nacos集群+MySQL生产环境配置
             1.预计需要 1个Nginx + 3个nacos注册中心 + 1个MySQL
             2.nacos下载Linux版
             3.集群配置步骤
@@ -950,10 +954,34 @@ SpringCloud Alibaba Nacos 服务注册和配置中心
                       nohup $JAVA -Dserver.port=${PORT}  ${JAVA_OPT} nacos.nacos >> ${BASE_DIR}/logs/start.out 2>&1 &
 
                 5.Nginx配置，它作为负载均衡器
+                    1.修改Nginx配置文件 /usr/local/nginx/conf/nginx.conf
+                    2.server listen 监控 1111端口，所有请求先通过1111访问，再通过location / 根目录配置分流。
+                        分流完后，配置upstream，撇出上面上个nacos集群配置节点
+                        upstream cluster{
+                            server 127.0.0.1:3333;
+                            server 127.0.0.1:4444;
+                            server 127.0.0.1:5555;
+                        }
+                        server{
+                            listen 1111;
+                            server_name localhost;
 
+                            location / {
+                                proxy_pass http://cluster;
+                            }
+                        }
+                    3.按照指定nginx.conf 启动 Nginx
+                        1. cd /usr/local/nginx/sbin/
+                        2. ./nginx -c /usr/local/nginx/conf/nginx.conf
             4.测试
-            5.高可用小结
+                1.启动Nginx ，3台nacos ，测试通过Nginx访问nacos http://192.168.111.144:1111/nacos/#/login 登陆创建配置成功OK
+                2.微服务启动能注册进nacos集群，并能读取配置，说明OK
+                    1.通过spring.cloud.nacos.discovery.server-addr=192.168.111.144:1111(nginx listen 配置的IP+端口)
+                        配置到连接nginx指定连接，然后由nginx转发给3333/4444/5555 随机一个注册微服务
+            5.高可用小结，见笔记截图
 
+
+SpringCloud Alibaba Sentinel 实现熔断与限流
 
 
 
