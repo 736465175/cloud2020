@@ -1067,7 +1067,9 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
                     ->流控模式:直接
                     ->流控效果:快速失败
                 2.(快速访问)http://localhost:8401/sentinel/testA 页面返回 Blocked by Sentinel (flow limiting)
-                    直接调用默认报错信息<Blocked by Sentinel (flow limiting)>，技术方面OK，但是也可以添加自己的后续处理
+                    直接调用默认报错信息<Blocked by Sentinel (flow limiting)>，技术方面OK，
+                        源码 com.alibaba.csp.sentinel.slots.block.BlockException
+                        但是也可以添加自己的后续处理，后续讲解
             2.关联
                 1.是什么
                     1.当关联的资源达到阈值时，就限流自己
@@ -1082,7 +1084,86 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
                     ->流控效果:快速失败
                 3.postman模拟并发密集访问testB
                 4.运行后发现A挂了
+            3.链路
+                多个请求调用了同一个微服务
         3.流控效果
+            1.快速失败：直接失败，抛异常  Blocked by Sentinel (flow limiting)
+                源码：com.alibaba.csp.sentinel.slots.block.flow.controller.DefaultController
+            2.Warm UP：根据codeFactor(冷加载因子，默认3)的值，从阈值/codeFactor，经过预热时长，才达到设置的QPS阈值
+                Warm Up（RuleConstant.CONTROL_BEHAVIOR_WARM_UP）方式，即预热/冷启动方式。当系统长期处于低水位的情况下，
+                当流量突然增加时，直接把系统拉升到高水位可能瞬间把系统压垮。通过"冷启动"，让通过的流量缓慢增加，在一定时间
+                内逐渐增加到阈值上限，给冷系统一个预热的时间，避免冷系统被压垮
+                源码：com.alibaba.csp.sentinel.slots.block.flow.controller.WarmUpController
+            3.排队等待：匀速排队，让请求以匀速的速度通过，阈值类型必须设置为QPS，否则无效
+                设置含义：/sentinel/testA 每秒1次请求，超过就排队等待，等待的超时时间为20000毫秒
+                源码：com.alibaba.csp.sentinel.slots.block.flow.controller.RateLimiterController
+
+    8.Sentinel 熔断降级
+        1.官网 https://github.com/alibaba/Sentinel/wiki/%E7%86%94%E6%96%AD%E9%99%8D%E7%BA%A7
+        2.概述
+            除了流量控制以外，对调用链路中不稳定的资源进行熔断降级也是保障高可用的重要措施之一。一个服务常常会调用别的模块，
+            可能是另外的一个远程服务、数据库，或者第三方 API 等。例如，支付的时候，可能需要远程调用银联提供的 API；查询某个
+            商品的价格，可能需要进行数据库查询。然而，这个被依赖服务的稳定性是不能保证的。如果依赖的服务出现了不稳定的情况，
+            请求的响应时间变长，那么调用服务的方法的响应时间也会变长，线程会产生堆积，最终可能耗尽业务自身的线程池，服务本身
+            也变得不可用。
+        3.特点
+            1.异常降级仅针对业务异常，对 Sentinel 限流降级本身的异常（BlockException）不生效
+            2.触发降级时，时间窗口结束时间内，对该资源的调用都自动熔断(默认行为是抛出DegradeException)
+            3.Sentinel 的断路器是 没有半开状态的
+        4.降级参数设置说明：
+            1.RT(平均响应时间，秒级)
+                平均响应时间 超出阈值 且 在时间窗口期内通过的请求>=5，两个条件同时满足后触发降级，窗口期过后关闭断路器。
+            2.异常比例(秒级)
+                QPS >= 5 且异常比例(秒级统计)超过阈值时，触发降级；时间窗口结束后关闭降级
+            3.异常数(分钟级)
+                异常数超过阈值时，触发降级；时间窗口结束后关闭降级
+
+    9.热点key限流
+        1.官网 https://github.com/alibaba/Sentinel/wiki/%E7%83%AD%E7%82%B9%E5%8F%82%E6%95%B0%E9%99%90%E6%B5%81
+        2.大纲
+            1.何为热点？热点即经常访问的数据。很多时候我们希望统计某个热点数据中访问频次最高的 Top K 数据，并对其访问进行限制。比如：
+                商品 ID 为参数，统计一段时间内最常购买的商品 ID 并进行限制
+                用户 ID 为参数，针对一段时间内频繁访问的用户 ID 进行限制
+            2.热点参数限流会统计传入参数中的热点参数，并根据配置的限流阈值与模式，对包含热点参数的资源调用进行限流。热点参数限流可以
+                看做是一种特殊的流量控制，仅对包含热点参数的资源调用生效。
+            3.Sentinel 利用 LRU 策略统计最近最常访问的热点参数，结合令牌桶算法来进行参数级别的流控。热点参数限流支持集群模式
+        3.@SentinelResource = @HystrixCommand
+            1.Controller 接口方法上注解 @SentinelResource(value = "testHotKey", blockHandler = "deal_testHotKey")
+                value = "testHotKey" 就变成 热点规则 的 资源名了，@GetMapping(value = "/sentinel/testHotKey") 路径作
+                为资源名名会失效。blockHandler = "deal_testHotKey" 就是兜底方法；这种注解方式这两个参数都必须要，因为
+                使用@SentinelResource后，Sentinel默认兜底方法对此热点资源失效
+            2.@SentinelResource 处理的是Sentinel控制台配置的违规异常情况，有blockHandler兜底方法
+                RuntimeException 是java运行时报出的运行时异常，@SentinelResource 不管
+        4.热点限流配置(普通版)
+             >资源名：testHotKey   为 @SentinelResource(value = "testHotKey" ，@GetMapping(value = "/sentinel/testHotKey")失效了
+            ->限流模式：QPS
+            ->参数索引: 0 表示Controller接口的第一个参数，有带这个参数才能受到热点限流保护
+            ->单机阈值： 1
+            ->统计窗口时长: 1
+        5.热点限流配置(参数例外项--特例)
+            普通版：超过1秒钟一个后，达到阈值1后立马限流
+            特例：我们希望p1参数当它是某个特殊值时，它的限流值和平时不一样，可以是另外一个限流值；这时就可以通过 参数例外项 补充
+
+    10.系统规则(粒度太大不适合，一般配置在网关Gateway比较合适)
+        1.官网 https://github.com/alibaba/Sentinel/wiki/%E7%B3%BB%E7%BB%9F%E8%87%AA%E9%80%82%E5%BA%94%E9%99%90%E6%B5%81
+        2.是什么：
+            Sentinel 系统自适应限流从整体维度对应用入口流量进行控制，结合应用的 Load、CPU 使用率、总体平均 RT、入口 QPS 和并发
+                线程数等几个维度的监控指标，通过自适应的流控策略，让系统的入口流量和系统的负载达到一个平衡，让系统尽可能跑在最大
+                吞吐量的同时保证系统整体的稳定性
+        3.系统规则支持以下的模式：
+            1.Load 自适应（仅对 Linux/Unix-like 机器生效）：系统的 load1 作为启发指标，进行自适应系统保护。当系统 load1 超过设
+                定的启发值，且系统当前的并发线程数超过估算的系统容量时才会触发系统保护（BBR 阶段）。系统容量由系统的
+                maxQps * minRt 估算得出。设定参考值一般是 CPU cores * 2.5。
+            2.CPU usage（1.5.0+ 版本）：当系统 CPU 使用率超过阈值即触发系统保护（取值范围 0.0-1.0），比较灵敏。
+            3.平均 RT：当单台机器上所有入口流量的平均 RT 达到阈值即触发系统保护，单位是毫秒。
+            4.并发线程数：当单台机器上所有入口流量的并发线程数达到阈值即触发系统保护。
+            5.入口 QPS：当单台机器上所有入口流量的 QPS 达到阈值即触发系统保护。
+
+    11.@SentinelResource详细讲解
+        https://www.bilibili.com/video/BV1zi4y1872h?p=127
+    12.服务熔断功能
+
+    13.规则持久化
 
 
 
