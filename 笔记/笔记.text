@@ -1160,7 +1160,7 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
             5.入口 QPS：当单台机器上所有入口流量的 QPS 达到阈值即触发系统保护。
 
     11.@SentinelResource详细讲解
-        https://www.bilibili.com/video/BV1zi4y1872h?p=127
+
     12.服务熔断功能
 
     13.规则持久化
