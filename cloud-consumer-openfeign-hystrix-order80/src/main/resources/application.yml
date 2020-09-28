@@ -19,7 +19,7 @@ eureka:
     instance-id: consumer8000
     prefer-ip-address: true #访问路径显示IP地址，方便排查
 
-#作用是开启Feign整合hystrix服务降级
+#激活hystrix服务降级对Feign的支持
 #@FeignClient(value = "CLOUD-PROVIDER-HYSTRIX-SERVICE", fallback = PaymentFallbackService.class) 才起作用
 feign:
   hystrix:

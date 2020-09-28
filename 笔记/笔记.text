@@ -119,6 +119,11 @@ CAP: 理论关注粒度是数据，而不是整体系统设计的策略
     OpenFeign 使用方法：(在consumer端使用)
         1.添加依赖 spring-cloud-starter-openfeign
         2.主启动类 添加 @EnableFeignClients 注解
+            1.注解@EnableFeignClients告诉框架扫描所有使用注解@FeignClient定义的feign客户端。它又通过注解@Import导入了类FeignClientsRegistrar( feign客户端注册器)
+            2.FeignClientsRegistrar : feign客户端注册器
+            3.FeignClientsRegistrar实现了接口 ImportBeanDefinitionRegistrar。而ImportBeanDefinitionRegistrar的设计目的，就是被某个实现类实现，
+                配合使用@Configuration注解的使用者配置类，在配置类被处理时，用于额外注册一部分bean定义
+
         3.编写业务逻辑接口并添加注解：@FeignClient(value = "CLOUD-PAYMENT-SERVICE"),
             这个接口直接复制provider的Controller方法完美。因为其整合了SpringMVC
         4.编写客户端Controller，调用上面的接口返回。
@@ -187,7 +192,7 @@ Hystrix断路器：(消费端、服务端都可以使用，一般是放在客户
         服务消费方：
             1.启动类 @EnableHystrix (开启服务降级熔断器，@EnableCircuitBreaker 的升级版?)
             2.业务类 一般在Controller层接口方法上注解 @HystrixCommand
-            3.yml要开启feign:hystrix:enabled: true (开启Feign整合hystrix服务降级)
+            3.yml要开启feign:hystrix:enabled: true (激活hystrix服务降级对Feign的支持)
 
         现有问题：每个业务方法对应一个兜底方法，代码膨胀。那么需要统一fallbackMethod和自定义fallbackMethod分开
             膨胀(Controller层)：
@@ -197,7 +202,7 @@ Hystrix断路器：(消费端、服务端都可以使用，一般是放在客户
 
             解耦(openFeign接口系列)：
                 1.只需要为客户端@FeignClient注解定义的接口添加一个服务降级处理的实现类，即可实现解耦,这个实现类需要扫描到spring容器；
-                    前提是yml要开启feign:hystrix:enabled: true (开启Feign整合hystrix服务降级)
+                    前提是yml要开启feign:hystrix:enabled: true (激活hystrix服务降级对Feign的支持)
                 2.例如 @FeignClient(value = "CLOUD-PROVIDER-HYSTRIX-SERVICE", fallback = PaymentFallbackService.class)
 
     服务熔断CircuitBreaker：
@@ -1129,13 +1134,12 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
             3.Sentinel 利用 LRU 策略统计最近最常访问的热点参数，结合令牌桶算法来进行参数级别的流控。热点参数限流支持集群模式
         3.@SentinelResource = @HystrixCommand
             1.Controller 接口方法上注解 @SentinelResource(value = "testHotKey", blockHandler = "deal_testHotKey")
-                value = "testHotKey" 就变成 热点规则 的 资源名了，@GetMapping(value = "/sentinel/testHotKey") 路径作
-                为资源名名会失效。blockHandler = "deal_testHotKey" 就是兜底方法；这种注解方式这两个参数都必须要，因为
-                使用@SentinelResource后，Sentinel默认兜底方法对此热点资源失效
+                value = "testHotKey" 就变成 热点规则 的 资源名了。blockHandler = "deal_testHotKey" 就是兜底方法；这种注解
+                方式这两个参数都必须要，因为使用@SentinelResource后，Sentinel默认兜底方法对此热点资源失效
             2.@SentinelResource 处理的是Sentinel控制台配置的违规异常情况，有blockHandler兜底方法
                 RuntimeException 是java运行时报出的运行时异常，@SentinelResource 不管
         4.热点限流配置(普通版)
-             >资源名：testHotKey   为 @SentinelResource(value = "testHotKey" ，@GetMapping(value = "/sentinel/testHotKey")失效了
+             >资源名：testHotKey
             ->限流模式：QPS
             ->参数索引: 0 表示Controller接口的第一个参数，有带这个参数才能受到热点限流保护
             ->单机阈值： 1
@@ -1160,9 +1164,90 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
             5.入口 QPS：当单台机器上所有入口流量的 QPS 达到阈值即触发系统保护。
 
     11.@SentinelResource详细讲解
+        1.按资源名称限流 + 后续处理
+            添加业务类RateLimitController
+            @SentinelResource(value = "byResource", blockHandler = "byResourceHandle")
+            方法1
+        2.按URL地址限流 + 后续处理
+            @SentinelResource(value = "byUrl")
+            @GetMapping("/sentinel/byUrl")
+            方法2   也可以在sentinel控制台对 资源名 /sentinel/byUrl 进行限流
+        3.上面兜底方法面临的问题
+            1.兜底方法与业务代码耦合，不直观
+            2.系统默认限流兜底方法不满足业务要求
+            3.每隔业务方法都需要兜底，代码膨胀
+            4.缺全局统一处理方法
+        4.客户自定义限流处理逻辑
+            1.创建CustomerBlockHandler 用于自定义限流处理逻辑、自定义限流处理类，做统一兜底方法
+            2.CustomerBlockHandler 的方法必须是static ，且返回 CommonResult 方便前端处理，无需注入到Spring容器
+            3.@SentinelResource(value = "customerBlockHandler", blockHandlerClass = CustomerBlockHandler.class
+                , blockHandler = "handlerBlockException2")
+        5.更多注解属性说明
+            1.@SentinelResource注解方式的埋点不支持private方法
+            2.Sentinel限流，所有代码都是try-catch-finally处理
+    12.服务熔断功能(重点)
+        1.sentinel整合ribbon + openFeign + fallback
+        2.Ribbon系列
+            1.提供者：
+                1.新建cloudalibaba-provider-payment9003/9004
+                2.pom、yml、主启动类同9001
+            2.消费者 cloudalibaba-consumer-nacos-order8001
+                pom/yml 同 cloudalibaba-sentinel-service8401
+                1.spring-cloud-starter-alibaba-nacos-discovery
+                2.spring-cloud-starter-alibaba-sentinel
+                3.业务类
+                    1.@SentinelResource(value = "fallback")
+                        //没配置熔断、限流兜底方法，业务异常返回出错页面，不友好
+                    2.@SentinelResource(value = "fallback", fallback = "handlerFallBack")
+                        //fallback只负责业务异常，fallback 方法可传入 Exception 参数
+                    3.@SentinelResource(value = "fallback", blockHandler = "blockHandler")
+                        //blockHandler只负责sentinel控制台限流配置违规，blockHandler 方法只能传入 BlockException 参数
+                    4.@SentinelResource(value = "fallback", blockHandler = "blockHandler", fallback = "handlerFallBack")
+                        //两个都配，当达到sentinel配置的QPS限流降级时，调用的是blockHandler 兜底方法
+                    5.异常忽略
+                        @SentinelResource(value = "fallback", blockHandler = "blockHandler", fallback =
+                            "handlerFallBack" , exceptionsToIgnore = {IllegalArgumentException.class})
+                        //如果报该IllegalArgumentException异常，不再有fallback方法兜底，没有降级效果了
+        3.Feign系列
+            1.Feign组件一般在消费侧
+            2.新建 cloudalibaba-consumer-nacos-feign-order8002模块
+            3.pom
+                1.spring-cloud-starter-alibaba-nacos-discovery
+                2.spring-cloud-starter-alibaba-sentinel
+                3.spring-cloud-starter-openfeign
+            4.yml
+                server:
+                  port: 8002
 
-    12.服务熔断功能
+                spring:
+                  application:
+                    name: nacos-sentinel-feign-order-consumer
+                  cloud:
+                    nacos:
+                      discovery:
+                        #nacos 服务注册中心地址
+                        server-addr: 127.0.0.1:8848
+                    sentinel:
+                      transport:
+                        #配置 sentinel dashboard 地址
+                        dashboard: 127.0.0.1:8080
+                        #默认8719端口，假如被占用会自动依次从8719+1扫描，直至找到未被占用的端口
+                        port: 8719
 
+                #自定义配置，消费者访问微服务名称
+                service-url:
+                  nacos-user-service: http://nacos-sentinel-payment-provider
+
+                #激活sentinel 对feign的支持
+                feign:
+                  sentinel:
+                    enabled: true
+            5.主启动
+                @SpringBootApplication
+                @EnableDiscoveryClient
+                @EnableFeignClients //启用feign客户端
+            6.业务类
+        4.熔断框架比较
     13.规则持久化
 
 
