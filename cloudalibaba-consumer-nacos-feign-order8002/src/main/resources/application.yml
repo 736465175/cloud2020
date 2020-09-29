@@ -20,7 +20,7 @@ spring:
 service-url:
   nacos-user-service: http://nacos-sentinel-payment-provider
 
-#激活sentinel 对feign的支持
+#激活sentinel，对feign的支持。同feign:hystrix:enabled: true意义一样，当服务提供方不可用时，全局兜底方法返回结果
 feign:
   sentinel:
     enabled: true

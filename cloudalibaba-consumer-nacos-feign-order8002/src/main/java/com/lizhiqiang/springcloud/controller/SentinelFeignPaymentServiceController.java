@@ -1,5 +1,7 @@
 package com.lizhiqiang.springcloud.controller;
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.lizhiqiang.springcloud.entities.CommonResult;
 import com.lizhiqiang.springcloud.entities.Payment;
 import com.lizhiqiang.springcloud.service.SentinelFeignPaymentService;
@@ -18,13 +20,25 @@ public class SentinelFeignPaymentServiceController {
     @Resource
     private SentinelFeignPaymentService feignPaymentService;
 
+
+
+//    没配置blockHandler，fallback；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时页面报异常，客户端运行错误走页面报错
+//    @SentinelResource(value = "sentinelfeign")
+
+//    没配置blockHandler，配置fallback；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时走fallback，客户端运行错误走fallback兜底
+//    @SentinelResource(value = "sentinelfeign", fallback = "handlerFallBack")
+
+//    没配置fallback，配置blockHandler；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时走blockHandler，客户端运行错误走页面报错
+//    @SentinelResource(value = "sentinelfeign", blockHandler = "blockHandler")
+
+//    配置fallback，配置blockHandler；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时走blockHandler，客户端运行错误走fallback兜底
+//    @SentinelResource(value = "sentinelfeign", blockHandler = "blockHandler", fallback = "handlerFallBack")
+
+//      配置fallback，blockHandler，exceptionsToIgnore；降级时走默认全局熔断兜底方法(IllegalArgumentException除外)，
+//      sentinel控制台限流配置违规时走blockHandler，客户端运行错误走fallback兜底(IllegalArgumentException除外)
+    @SentinelResource(value = "sentinelfeign", fallback = "handlerFallBack", blockHandler = "blockHandler",
+            exceptionsToIgnore = {IllegalArgumentException.class})
     @GetMapping(value = "/consumer/payment/sentinelfeign/{id}")
-//    @SentinelResource(value = "fallback", fallbackClass = SentinelFeignPaymentFallbackService.class) //没配置熔断兜底方法
-//    @SentinelResource(value = "fallback", fallback = "handlerFallBack") //fallback只负责业务异常
-//    @SentinelResource(value = "fallback", blockHandler = "blockHandler") //blockHandler只负责sentinel控制台限流配置违规
-//    @SentinelResource(value = "fallback", blockHandler = "blockHandler", fallback = "handlerFallBack")
-//    @SentinelResource(value = "fallback", blockHandler = "blockHandler", fallback = "handlerFallBack"
-//            , exceptionsToIgnore = {IllegalArgumentException.class})
     public CommonResult<Payment> sentinelFeign(@PathVariable("id") Long id){
         CommonResult<Payment> commonResult = feignPaymentService.paymentSQL(id);
         if(id == 4){
@@ -36,4 +50,15 @@ public class SentinelFeignPaymentServiceController {
         return commonResult;
     }
 
+    //私有的 fallback
+    public CommonResult<Payment> handlerFallBack(Long id, Throwable e){
+        Payment payment = new Payment(id, null);
+        return new CommonResult<>(444, "私有的 兜底异常handlerFallBack ，错误内容：" + e.getMessage(), payment);
+    }
+
+    //私有的blockHandler
+    public CommonResult<Payment> blockHandler(Long id, BlockException e){
+        Payment payment = new Payment(id, null);
+        return new CommonResult<>(445, "私有的 blockHandler-sentinel限流 ，错误内容：" + e.toString(), payment);
+    }
 }

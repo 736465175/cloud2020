@@ -1179,7 +1179,7 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
             4.缺全局统一处理方法
         4.客户自定义限流处理逻辑
             1.创建CustomerBlockHandler 用于自定义限流处理逻辑、自定义限流处理类，做统一兜底方法
-            2.CustomerBlockHandler 的方法必须是static ，且返回 CommonResult 方便前端处理，无需注入到Spring容器
+            2.CustomerBlockHandler 的方法必须是static ，且返回 CommonResult 方便前端处理，无需注入到Spring容器(因为静态？)
             3.@SentinelResource(value = "customerBlockHandler", blockHandlerClass = CustomerBlockHandler.class
                 , blockHandler = "handlerBlockException2")
         5.更多注解属性说明
@@ -1203,7 +1203,7 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
                     3.@SentinelResource(value = "fallback", blockHandler = "blockHandler")
                         //blockHandler只负责sentinel控制台限流配置违规，blockHandler 方法只能传入 BlockException 参数
                     4.@SentinelResource(value = "fallback", blockHandler = "blockHandler", fallback = "handlerFallBack")
-                        //两个都配，当达到sentinel配置的QPS限流降级时，调用的是blockHandler 兜底方法
+                        //两个都配(就是绝配，降级限流优秀框架)，当达到sentinel配置的QPS限流降级时，调用的是blockHandler 兜底方法
                     5.异常忽略
                         @SentinelResource(value = "fallback", blockHandler = "blockHandler", fallback =
                             "handlerFallBack" , exceptionsToIgnore = {IllegalArgumentException.class})
@@ -1238,7 +1238,8 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
                 service-url:
                   nacos-user-service: http://nacos-sentinel-payment-provider
 
-                #激活sentinel 对feign的支持
+
+                #激活sentinel，对feign的支持。同feign:hystrix:enabled: true意义一样，当服务提供方不可用时，全局兜底方法返回结果
                 feign:
                   sentinel:
                     enabled: true
@@ -1247,11 +1248,50 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
                 @EnableDiscoveryClient
                 @EnableFeignClients //启用feign客户端
             6.业务类
+                1.SentinelFeignPaymentService 接口 : @FeignClient(value = "${service-url.nacos-user-service}", fallback = SentinelFeignPaymentFallbackService.class)
+                2.SentinelFeignPaymentFallbackService implements SentinelFeignPaymentService 全局服务降级兜底类 @Service
+                3.controller
+                        没配置blockHandler，fallback；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时页面报异常，客户端运行错误走页面报错
+                        @SentinelResource(value = "sentinelfeign")
+
+                        没配置blockHandler，配置fallback；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时走fallback，客户端运行错误走fallback兜底
+                        @SentinelResource(value = "sentinelfeign", fallback = "handlerFallBack")
+
+                        没配置fallback，配置blockHandler；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时走blockHandler，客户端运行错误走页面报错
+                        @SentinelResource(value = "sentinelfeign", blockHandler = "blockHandler")
+
+                        配置fallback，配置blockHandler；降级时走默认全局熔断兜底方法，sentinel控制台限流配置违规时走blockHandler，客户端运行错误走fallback兜底
+                        @SentinelResource(value = "sentinelfeign", blockHandler = "blockHandler", fallback = "handlerFallBack")
+
+                        配置fallback，blockHandler，exceptionsToIgnore；降级时走默认全局熔断兜底方法(IllegalArgumentException除外)，
+                        sentinel控制台限流配置违规时走blockHandler，客户端运行错误走fallback兜底(IllegalArgumentException除外),IllegalArgumentException走页面报错
+                        @SentinelResource(value = "sentinelfeign", fallback = "handlerFallBack", blockHandler = "blockHandler",
+                                exceptionsToIgnore = {IllegalArgumentException.class})
+
         4.熔断框架比较
+                        Sentinel                        Hystrix(过时)        resilience4j(国外流行)
+            隔离策略     信号量隔离(并发线程数限流)         线程池/信号量隔离     信号量隔离
+            熔断降级策略  基于响应时间、异常比率、异常数     基于异常比率          基于响应时间、异常比率
+            实时统计实现  滑动窗口(LeapArray)             滑动窗口(RxJava)      Ring Bit Buffer
+            动态规则配置  支持多种数据源                   支持多种数据源        有限支持
+            扩展性       多个扩展点                       插件形式             接口形式
+            基于注解支持  支持                            支持                 支持
+            限流         基于QPS，支持基于调用关系的限流    有限的支持           Rate Limiter
+
     13.规则持久化
-
-
-
+        1.默认启动Sentinel对限流规则未做持久化，重启所有限流熔断降级配置全部丢失
+        2.以cloudalibaba-sentinel-service8401做案例说明
+        3.将限流配置规则持久化进Nacos保存，只要刷新8401某个rest地址，sentinel控制台的流控规则就能看到，只要nacos里面配置
+            不删除，针对8401上的sentinel上流控规则持续有效
+        4.步骤：
+            1.pom依赖添加
+                原来依赖基础上添加
+            2.yml
+            3.添加nacos业务规则配置
+            4.启动8401后刷新sentinel发现业务规则有了
+            5.快速访问测试接口
+            6.停止8401再看sentinel
+            7.重启8401再看sentinel
 
 
 
