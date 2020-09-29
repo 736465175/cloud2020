@@ -1285,13 +1285,52 @@ SpringCloud Alibaba Sentinel 实现熔断与限流(哨兵)
             不删除，针对8401上的sentinel上流控规则持续有效
         4.步骤：
             1.pom依赖添加
-                原来依赖基础上添加
+                原来依赖基础上添加 sentinel-datasource-nacos
             2.yml
+                spring:
+                  application:
+                    name: cloudalibaba-sentinel-service
+                  cloud:
+                    nacos:
+                      discovery:
+                        #nacos 服务注册中心地址
+                        server-addr: 127.0.0.1:8848
+                    sentinel:
+                      transport:
+                        #配置 sentinel dashboard 地址
+                        dashboard: 127.0.0.1:8080
+                        #默认8719端口，假如被占用会自动依次从8719+1扫描，直至找到未被占用的端口
+                        port: 8719
+                      #添加sentinel数据源,将限流配置规则持久化进Nacos保存
+                      datasource:
+                        ds1:
+                          nacos:
+                            server-addr: ${spring.cloud.nacos.discovery.server-addr}
+                            dataId: ${spring.application.name}
+                            groupId: DEFAULT_GROUP
+                            data-type: json
+                            rule-type: flow
             3.添加nacos业务规则配置
-            4.启动8401后刷新sentinel发现业务规则有了
-            5.快速访问测试接口
-            6.停止8401再看sentinel
-            7.重启8401再看sentinel
+                1.在nacos配置中心添加配置cloudalibaba-sentinel-service，json格式
+                2.内容
+                    [{
+                        "resource": "customerBlockHandler",   资源名称
+                        "limitApp": "default",                来源应用
+                        "grade": 1,                           阈值类型：0表示线程，1表示QPS
+                        "count": 1,                           单机阈值
+                        "strategy": 0,                        流控模式(策略)：0表示直接，1表示关联，2表示链路
+                        "controlBehavior": 0,                 流控效果：0快速失败，1 WarmUp，2排队等待
+                        "clusterMode": false                  是否集群
+                    }]
+            4.启动8401后，访问http://localhost:8401/sentinel/customerBlockHandler，刷新sentinel发现限流规则有了；
+                快速访问测试接口，看到限流兜底方法生效；停止8401再看sentinel上该流控规则消失了；重启8401后访问
+                http://localhost:8401/sentinel/customerBlockHandler再看sentinel上流控规则出现，持久化完成。
+
+
+SpringCloud Alibaba Seata处理分布式事务
+
+
+
 
 
 
