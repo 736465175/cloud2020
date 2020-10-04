@@ -1,0 +1,40 @@
+server:
+  port: 2002
+
+spring:
+  application:
+    name: nacos-seata-storage-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    alibaba:
+      seata:
+        #自定义事务组名称,需要与seata-server中对应
+        tx-service-group: lzq_tx_group
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/seata_storage
+    username: root
+    password: 123456
+
+#开启feign熔断降级
+feign:
+  hystrix:
+    enabled: true
+
+logging:
+  level:
+    io:
+      seata: info
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  #所有Entity别名类所在包
+  type-aliases-package: com.lizhiqiang.springcloud.entities
+
+#自定义配置，openFeign微服务调用好使用
+service-url:
+  nacos-seata-order-service: http://nacos-seata-order-service
+  nacos-seata-storage-service: http://nacos-seata-storage-service
+  nacos-seata-account-service: http://nacos-seata-account-service
