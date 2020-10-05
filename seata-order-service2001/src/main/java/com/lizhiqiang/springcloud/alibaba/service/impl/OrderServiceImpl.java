@@ -6,6 +6,7 @@ import com.lizhiqiang.springcloud.alibaba.service.OrderService;
 import com.lizhiqiang.springcloud.alibaba.service.StorageService;
 import com.lizhiqiang.springcloud.entities.CommonResult;
 import com.lizhiqiang.springcloud.entities.Order;
+import com.lizhiqiang.springcloud.entities.Storage;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,8 +36,8 @@ public class OrderServiceImpl implements OrderService {
         orderDao.create(order);
 
         log.info("------>订单微服务开始调用库存微服务，减库存Count start");
-        storageService.decrease(order.getProductId(), order.getCount());
-
+        CommonResult<Storage> storage = storageService.decrease(order.getProductId(), order.getCount());
+        log.info(storage.toString());
         log.info("------>订单微服务开始调用库存微服务，减库存Count end");
 
         log.info("----->订单微服务开始调用账户微服务，扣余额Money start");

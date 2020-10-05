@@ -24,7 +24,7 @@ public class AccountServiceImpl implements AccountService {
 
         //        TODO 模拟超时异常，全局事务回滚？
         try {
-            TimeUnit.SECONDS.sleep(20);
+            TimeUnit.SECONDS.sleep(10);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
