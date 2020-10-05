@@ -4,10 +4,8 @@ import com.lizhiqiang.springcloud.alibaba.dao.OrderDao;
 import com.lizhiqiang.springcloud.alibaba.service.AccountService;
 import com.lizhiqiang.springcloud.alibaba.service.OrderService;
 import com.lizhiqiang.springcloud.alibaba.service.StorageService;
-import com.lizhiqiang.springcloud.entities.Account;
 import com.lizhiqiang.springcloud.entities.CommonResult;
 import com.lizhiqiang.springcloud.entities.Order;
-import com.lizhiqiang.springcloud.entities.Storage;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,32 +31,24 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @GlobalTransactional(name = "lzq-order-create-tran", rollbackFor = Exception.class)
     public CommonResult<Order> create(Order order) {
-        log.info("------>开始新建订单");
+        log.info("------>开始新建订单 start");
         orderDao.create(order);
 
-        log.info("------>订单微服务开始调用库存微服务，减库存Count");
-        CommonResult<Storage> storage = storageService.decrease(order.getProductId(), order.getCount());
-        if(storage.getCode() == 200){
-            log.info("------>订单微服务开始调用库存微服务，减库存Count end");
-        }else{
-            log.error("------>订单微服务开始调用库存微服务，减库存Count fail");
-            return new CommonResult<>(storage.getCode(), "订单创建失败,原因是：" + storage.getMessage(), order);
-        }
+        log.info("------>订单微服务开始调用库存微服务，减库存Count start");
+        storageService.decrease(order.getProductId(), order.getCount());
 
-        log.info("----->订单微服务开始调用账户微服务，扣余额Money");
-        CommonResult<Account> account = accountService.decrease(order.getUserId(), order.getMoney());
-        if(account.getCode() == 200){
-            log.info("------>订单微服务开始调用账户微服务，扣余额Money end");
-        }else{
-            log.error("------>订单微服务开始调用账户微服务，扣余额Money fail");
-            return new CommonResult<>(account.getCode(), "订单创建失败,原因是：" + account.getMessage(), order);
-        }
+        log.info("------>订单微服务开始调用库存微服务，减库存Count end");
+
+        log.info("----->订单微服务开始调用账户微服务，扣余额Money start");
+        accountService.decrease(order.getUserId(), order.getMoney());
+        log.info("------>订单微服务开始调用账户微服务，扣余额Money end");
 
         //4.修改订单状态，0到1 表示订单完成
-        log.info("------>修改订单状态开始");
+        log.info("------>修改订单状态开始 start");
         orderDao.update(order.getUserId(), order.getProductId());
         log.info("------>修改订单状态开始 end");
-        log.info("------>下订单 end");
+
+        log.info("------>下订单全部 end");
         return new CommonResult<>(200, "订单创建完成", order);
     }
 

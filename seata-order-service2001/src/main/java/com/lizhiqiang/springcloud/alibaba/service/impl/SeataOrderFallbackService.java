@@ -1,3 +1,4 @@
+/*
 package com.lizhiqiang.springcloud.alibaba.service.impl;
 
 import com.lizhiqiang.springcloud.alibaba.service.AccountService;
@@ -5,11 +6,11 @@ import com.lizhiqiang.springcloud.alibaba.service.StorageService;
 import com.lizhiqiang.springcloud.entities.Account;
 import com.lizhiqiang.springcloud.entities.CommonResult;
 import com.lizhiqiang.springcloud.entities.Storage;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
-@Component
+@Service
 public class SeataOrderFallbackService implements AccountService, StorageService {
 
     @Override
@@ -22,3 +23,4 @@ public class SeataOrderFallbackService implements AccountService, StorageService
         return new CommonResult<>(402, "抱歉，删减库存失败，请稍后再试!!!");
     }
 }
+*/

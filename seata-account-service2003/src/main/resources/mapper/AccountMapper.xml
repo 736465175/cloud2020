@@ -15,7 +15,7 @@
     </resultMap>
 
     <update id="decrease">
-        update t_account set used = used + #{money},residue = residue - #{money}
-        where user_id=#{userId}
+        update t_account set used=used + #{money},residue=residue - #{money}
+        where user_id=#{userId};
     </update>
 </mapper>

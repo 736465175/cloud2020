@@ -1491,7 +1491,8 @@ SpringCloud Alibaba Seata处理分布式事务
             2.注解，name=xxx 唯一就行，rollbackFor=xxx表示什么异常时一定要回滚全局事务。
                 @GlobalTransactional(name = "lzq-order-create-tran", rollbackFor = Exception.class)
                 com.lizhiqiang.springcloud.alibaba.service.impl.OrderServiceImpl.create(Order order)
-            3.结果：数据库没发生任何变化，
+            3.结果：调用2002/2003服务没有给其设置全局服务降级兜底方法时：数据库没发生任何变化，全局事务回退
+                反之，有服务降级兜底方法时，全局事务失效！！！
 
 
 

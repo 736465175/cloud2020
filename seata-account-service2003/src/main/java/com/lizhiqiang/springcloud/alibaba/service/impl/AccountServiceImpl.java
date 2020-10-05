@@ -21,12 +21,14 @@ public class AccountServiceImpl implements AccountService {
     @Override
     public CommonResult<Account> decrease(Long userId, BigDecimal money) {
         log.info("------->nacos-seata-storage-service 扣减余额开始");
-//        TODO 模拟超时异常，全局事务回滚？
+
+        //        TODO 模拟超时异常，全局事务回滚？
         try {
             TimeUnit.SECONDS.sleep(20);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
         accountDao.decrease(userId, money);
         log.info("------->nacos-seata-storage-service 扣减余额结束");
         return new CommonResult<>(200, "减余额成功");

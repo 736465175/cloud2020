@@ -15,7 +15,7 @@ public class SeataOrderController {
     private OrderService orderService;
 
     @GetMapping("/seata/order/create")
-    public CommonResult<Order> create(Order order){
+    public CommonResult<Order> create(Order order) throws Exception {
         return orderService.create(order);
     }
 
