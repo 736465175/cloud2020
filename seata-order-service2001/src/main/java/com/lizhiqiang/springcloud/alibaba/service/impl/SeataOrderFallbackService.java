@@ -1,4 +1,3 @@
-/*
 package com.lizhiqiang.springcloud.alibaba.service.impl;
 
 import com.lizhiqiang.springcloud.alibaba.service.AccountService;
@@ -23,4 +22,3 @@ public class SeataOrderFallbackService implements AccountService, StorageService
         return new CommonResult<>(402, "抱歉，删减库存失败，请稍后再试!!!");
     }
 }
-*/
